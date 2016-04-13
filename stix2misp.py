@@ -84,132 +84,63 @@ def mispBuildObject(object_type, properties, event, args):
         print "        size_in_bytes: "+str(properties.size_in_bytes)
         # print "        hashes_dir: "+str(dir(properties.hashes))
         
+        # Get other file info
+        if properties.file_name:
+            file_name=str(properties.file_name)
+        else:
+            file_name=""
+        if properties.file_path:
+            file_path=str(properties.file_path)
+        else:
+            file_path=""
+        if properties.size:
+            size = str(properties.size)
+        elif properties.size_in_bytes:
+            size = str(properties.size_in_bytes)
+        else:
+            size = ""
+        if properties.file_format:
+            file_format = str(properties.file_format)
+        else:
+            file_format = ""
+            
+        # Build the comment w/ related info
+        comment = ""
+        if file_path:
+            comment="[PATH] "+file_path
+        if size:
+            if comment:
+                comment=comment+" | [SIZE] "+size
+            else:
+                comment="[SIZE] "+size
+        if file_format:
+            if comment:
+                comment = comment+" | [FORMAT] "+file_format
+            else:
+                comment = "[FORMAT] "+file_format
+        
         for hash in properties.hashes:
             print "        "+str(hash.type_)+": "+str(hash)
-            
+
             # Add to MISP
             if str(hash.type_)=="MD5":
                 # Add the hash by itself
                 #misp.add_hashes(event, md5=str(hash))
-                
-                # Get other file info
-                if properties.file_name:
-                    file_name=str(properties.file_name)
-                else:
-                    file_name=""
-                if properties.file_path:
-                    file_path=str(properties.file_path)
-                else:
-                    file_path=""
-                if properties.size:
-                    size = str(properties.size)
-                elif properties.size_in_bytes:
-                    size = str(properties.size_in_bytes)
-                else:
-                    size = ""
-                    
-                # Add the hash and all related info
-                comment = ""
-                if file_path:
-                    comment="[PATH] "+file_path
-                if size:
-                    if comment:
-                        comment=comment+" | [SIZE] "+size
-                    else:
-                        comment="[SIZE] "+size
                 misp.add_hashes(event, filename=str(properties.file_name), md5=str(hash), comment=comment, to_ids=args.ids)
                 
             elif str(hash.type_)=="SHA1":
                 # Add the hash by itself
                 #misp.add_hashes(event, sha1=str(hash))
-                
-                # Get other file info
-                if properties.file_name:
-                    file_name=str(properties.file_name)
-                else:
-                    file_name=""
-                if properties.file_path:
-                    file_path=str(properties.file_path)
-                else:
-                    file_path=""
-                if properties.size:
-                    size = str(properties.size)
-                elif properties.size_in_bytes:
-                    size = str(properties.size_in_bytes)
-                else:
-                    size = ""
-                    
-                # Add the hash and all related info
-                comment = ""
-                if file_path:
-                    comment="[PATH] "+file_path
-                if size:
-                    if comment:
-                        comment=comment+" | [SIZE] "+size
-                    else:
-                        comment="[SIZE] "+size
                 misp.add_hashes(event, filename=str(properties.file_name), sha1=str(hash), comment=comment, to_ids=args.ids)
                 
             elif str(hash.type_)=="SHA256":
                 # Add the hash by itself
                 #misp.add_hashes(event, sha256=str(hash))
-                
-                # Get other file info
-                if properties.file_name:
-                    file_name=str(properties.file_name)
-                else:
-                    file_name=""
-                if properties.file_path:
-                    file_path=str(properties.file_path)
-                else:
-                    file_path=""
-                if properties.size:
-                    size = str(properties.size)
-                elif properties.size_in_bytes:
-                    size = str(properties.size_in_bytes)
-                else:
-                    size = ""
-                    
-                # Add the hash and all related info
-                comment = ""
-                if file_path:
-                    comment="[PATH] "+file_path
-                if size:
-                    if comment:
-                        comment=comment+" | [SIZE] "+size
-                    else:
-                        comment="[SIZE] "+size
                 misp.add_hashes(event, filename=str(properties.file_name), sha256=str(hash), comment=comment, to_ids=args.ids)
                 
             elif str(hash.type_)=="SSDEEP":
                 # Add the hash by itself
                 #misp.add_hashes(event, ssdeep=str(hash))
-                
-                # Get other file info
-                if properties.file_name:
-                    file_name=str(properties.file_name)
-                else:
-                    file_name=""
-                if properties.file_path:
-                    file_path=str(properties.file_path)
-                else:
-                    file_path=""
-                if properties.size:
-                    size = str(properties.size)
-                elif properties.size_in_bytes:
-                    size = str(properties.size_in_bytes)
-                else:
-                    size = ""
-                    
-                # Add the hash and all related info
-                comment = ""
-                if file_path:
-                    comment="[PATH] "+file_path
-                if size:
-                    if comment:
-                        comment=comment+" | [SIZE] "+size
-                    else:
-                        comment="[SIZE] "+size
                 misp.add_hashes(event, filename=str(properties.file_name), ssdeep=str(hash), comment=comment, to_ids=args.ids)
                 
         
@@ -231,6 +162,8 @@ def mispBuildObject(object_type, properties, event, args):
                 
                 # Add to MISP
                 misp.add_regkey(event, str(properties.key), rvalue=str(value.data), to_ids=args.ids)
+        else:
+            misp.add_regkey(event, str(properties.key), to_ids=args.ids)
                 
     # Grab Domain Names:
     if "DomainNameObjectType" in str(object_type):
