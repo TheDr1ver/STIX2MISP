@@ -270,11 +270,28 @@ def processSTIX(pkg, args, misp_url, misp_key):
     
     if args.forcetag:
         # Add the package ID as a tag
-        tag = str(pkg._id)
-        forceTag(pkg, args, misp, event, tag)
+        try:
+            tag = str(pkg._id)
+        except AttributeError:
+            tag = ""
+        if tag:
+            forceTag(pkg, args, misp, event, tag)
+            
         # Add the package title as a tag
-        tag = str(pkg.stix_header.title)
-        forceTag(pkg, args, misp, event, tag)
+        try:
+            tag = str(pkg.stix_header.title)
+        except AttributeError:
+            tag = ""
+        if tag:
+            forceTag(pkg, args, misp, event, tag)
+            
+        # Add the sender's name as a tag
+        try:
+            tag = str(pkg.stix_header.information_source.identity.name)
+        except AttributeError:
+            tag = ""
+        if tag:
+            forceTag(pkg, args, misp, event, tag)
     
     
     # Output to screen
