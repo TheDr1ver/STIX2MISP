@@ -21,6 +21,8 @@ import requests
 import time
 import base64
 import os
+import glob
+import re
 
 def mispBuildEvent(misp,misp_url, misp_key,misp_title,misp_date,args):
     # Build the new event
@@ -301,34 +303,27 @@ def processDescriptions(misp,event,filename,all_desc):
     to_post['request']['files'] = [{'filename':filename, 'data': base64.b64encode(all_desc)}]
     out = misp._upload_sample(to_post)
     
+def forceTag(pkg, args, misp, event, tag):
+    if args.mask:
+        if not re.match(args.mask,tag):
+            print str(tag)+" does not match the regular expression "+str(args.mask)
+            print "Skipping tag"
+            return
+        else:
+            print str(tag)+" matches the regular expression "+str(args.mask)
+    print "adding FORCETAG: "+tag
+    out=misp.add_tag(event, tag)
+    print "Response: "+str(out)
+    if 'errors' in out and out['errors']=='Invalid Tag.':
+        print "Tag does not exist. Adding Tag..."
+        out=misp.new_tag(tag, exportable=True)
+        print "Response: "+str(out)
+        print "Attempting to add tag '"+str(tag)+"' again..."
+        out=misp.add_tag(event, tag)
+        print "Response: "+str(out)
+
         
-        
-
-if __name__ == "__main__":
-
-    # MISP Login Info - CHANGE THIS OR IT WON'T WORK!
-    misp_url = 'http://<your_misp_url>'
-    misp_key = '<your_misp_api_key>'
-
-    # Input Parser
-    
-    parser = argparse.ArgumentParser(description="EXAMPLE: stix2misp.py -i stix_file.xml -T \"custom tag, tag2\" -F")
-    parser.add_argument("-i", "--input", type=str, required=True, help="STIX file to upload to MISP")
-    parser.add_argument("-d", "--distrib", type=int, help="The distribution setting used for the attributes and for the newly created event, if relevant. [0-3]. DEFAULT: 0")
-    parser.add_argument("-ids", action='store_false', help="Setting this flag tells MISP NOT to add these to the IDS")
-    parser.add_argument("-a", "--analysis", type=int, help="The analysis level of the newly created event, if applicatble. [0-2] DEFAULT: 2")
-    parser.add_argument("-t", "--threat", type=int, help="The threat level ID of the newly created event, if applicatble. [1-4] DEFAULT: 3")
-    parser.add_argument("-T", "--tag", type=str, help="Add a comma-separated list of tags to add to the event")
-    parser.add_argument("-F", "--forcetag", action='store_true', help="Automatically adds the Title and ID of the STIX package as tags")
-    args = parser.parse_args()
-    
-    # Build the intial STIX object
-    if os.path.isfile(args.input):
-        pkg = STIXPackage.from_xml(args.input)
-    else:
-        print "Invalid file"
-        exit(0)
-    
+def processSTIX(pkg, args, misp_url, misp_key):
     # Load the PyMISP functions
     misp = PyMISP(misp_url, misp_key, True, 'json')
     
@@ -339,30 +334,14 @@ if __name__ == "__main__":
     event = mispBuildEvent(misp,misp_url,misp_key,misp_title,misp_date,args)
     
     # Process force-tags if applicable
+    
     if args.forcetag:
+        # Add the package ID as a tag
         tag = str(pkg._id)
-        print "adding FORCETAG: "+tag
-        out=misp.add_tag(event, tag)
-        print "Response: "+str(out)
-        if 'errors' in out and out['errors']=='Invalid Tag.':
-            print "Tag does not exist. Adding Tag..."
-            out=misp.new_tag(tag, exportable=True)
-            print "Response: "+str(out)
-            print "Attempting to add tag '"+str(tag)+"' again..."
-            out=misp.add_tag(event, tag)
-            print "Response: "+str(out)
-        
+        forceTag(pkg, args, misp, event, tag)
+        # Add the package title as a tag
         tag = str(pkg.stix_header.title)
-        print "adding FORCETAG: "+tag
-        out=misp.add_tag(event, tag)
-        print "Response: "+str(out)
-        if 'errors' in out and out['errors']=='Invalid Tag.':
-            print "Tag does not exist. Adding Tag..."
-            out=misp.new_tag(tag, exportable=True)
-            print "Response: "+str(out)
-            print "Attempting to add tag '"+str(tag)+"' again..."
-            out=misp.add_tag(event, tag)
-            print "Response: "+str(out)
+        forceTag(pkg, args, misp, event, tag)
     
     
     # Output to screen
@@ -383,20 +362,18 @@ if __name__ == "__main__":
                 inc_desc = str(inc_desc)
                 all_inc_desc = all_inc_desc+"=============NEW DESCRIPTION=============\n\n"+inc_desc
         
-    
+    # Loop through all indicators
     for ind in pkg.indicators:
-        # print dir(ind)
         
         for type in ind.indicator_types:
             print "Indicator Type: "+str(type)
-        
-        # Commenting out descriptions for testing
-        
+
+        # Collect indicator descriptions
         for ind_desc in ind.descriptions:
             if ind_desc:
                 ind_desc = str(ind_desc)
                 all_ind_desc = all_ind_desc+"\n\n=============NEW DESCRIPTION=============\n\n"+ind_desc
-            
+        
         # For processing STIX w/ composite_indicator_expression(s)
         if ind.composite_indicator_expression:
             for cie in ind.composite_indicator_expression:
@@ -407,7 +384,7 @@ if __name__ == "__main__":
                 # processObject(object_type, properties)
                 mispBuildObject(object_type, properties, event, args)
                 
-        # For processing STIX that skips composite_indicator_expression(s)        
+        # For processing STIX that without composite_indicator_expression(s)        
         else:
             properties=ind.observable.object_.properties
             object_type=properties._XSI_TYPE
@@ -426,5 +403,41 @@ if __name__ == "__main__":
     if all_inc_desc:
         # Grab all the descriptions and add them to the event in a text file
         filename=str(event['Event']['id'])+"_Incident_Descriptions.txt"
-        processDescriptions(misp,event,filename,all_inc_desc)    
+        processDescriptions(misp,event,filename,all_inc_desc)
+
+if __name__ == "__main__":
+
+    # MISP Login Info - CHANGE THIS OR IT WON'T WORK!
+    misp_url = 'http://<your_misp_url>'
+    misp_key = '<your_misp_api_key>'
+
+    # Input Parser
+    
+    parser = argparse.ArgumentParser(description="EXAMPLE: stix2misp.py -i stix_file.xml -T \"custom tag, tag2\" -F -m \"^[A-Z0-9-]*$\"")
+    parser.add_argument("-i", "--input", type=str, required=True, help="STIX file to upload to MISP")
+    parser.add_argument("-d", "--distrib", type=int, help="The distribution setting used for the attributes and for the newly created event, if relevant. [0-3]. DEFAULT: 0")
+    parser.add_argument("-ids", action='store_false', help="Setting this flag tells MISP NOT to add these to the IDS")
+    parser.add_argument("-a", "--analysis", type=int, help="The analysis level of the newly created event, if applicatble. [0-2] DEFAULT: 2")
+    parser.add_argument("-t", "--threat", type=int, help="The threat level ID of the newly created event, if applicatble. [1-4] DEFAULT: 3")
+    parser.add_argument("-T", "--tag", type=str, help="Add a comma-separated list of tags to add to the event")
+    parser.add_argument("-F", "--forcetag", action='store_true', help="Automatically adds the Title and ID of the STIX package as tags")
+    parser.add_argument("-m", "--mask", type=str, help="Add a Regex mask for the forcetag option to avoid unnecessarily long tagging (e.g. \"^[A-Z0-9-]*$\"). Must be run in conjunction with -F.")
+    args = parser.parse_args()
+    
+    # Build the intial STIX object
+    files=[]
+    if os.path.isfile(args.input):
+        files = [args.input]
+    elif os.path.isdir(args.input):
+        files = [f for f in glob.iglob(os.path.join(args.input + '*'))]
+    else:
+        print "Invalid file"
+        exit(0)
+    
+    
+    # Process the STIX file(s)
+    for stix_file in files:
+        pkg = STIXPackage.from_xml(stix_file)
+        processSTIX(pkg, args, misp_url, misp_key)
+        
         
