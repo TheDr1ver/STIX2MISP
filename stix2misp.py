@@ -46,6 +46,9 @@ def mispBuildEvent(misp,misp_url, misp_key,misp_title,misp_date,args):
             out=misp.add_tag(event, tag)
             print "Response: "+str(out)
             
+            # Add tag as internal reference
+            misp.add_internal_other(event, tag)
+            
             # print "out errors: "+out['errors']
             # exit(0)
             
@@ -276,6 +279,8 @@ def processSTIX(pkg, args, misp_url, misp_key):
             tag = ""
         if tag:
             forceTag(pkg, args, misp, event, tag)
+            # Add Internal Reference Attribute
+            misp.add_internal_other(event, tag)
             
         # Add the package title as a tag
         try:
@@ -284,6 +289,8 @@ def processSTIX(pkg, args, misp_url, misp_key):
             tag = ""
         if tag:
             forceTag(pkg, args, misp, event, tag)
+            # Add Internal Reference Attribute
+            misp.add_internal_other(event, tag)
             
         # Add the sender's name as a tag
         try:
@@ -292,6 +299,12 @@ def processSTIX(pkg, args, misp_url, misp_key):
             tag = ""
         if tag:
             forceTag(pkg, args, misp, event, tag)
+            # Add Internal Reference Attribute
+            #
+            # Commenting this out because it would end up saying every STIX document
+            # coming from the same originator is related.
+            #
+            # misp.add_internal_other(event, tag)
     
     
     # Output to screen
@@ -372,6 +385,7 @@ if __name__ == "__main__":
     parser.add_argument("-T", "--tag", type=str, help="Add a comma-separated list of tags to add to the event")
     parser.add_argument("-F", "--forcetag", action='store_true', help="Automatically adds the Title and ID of the STIX package as tags")
     parser.add_argument("-m", "--mask", type=str, help="Add a Regex mask for the forcetag option to avoid unnecessarily long tagging (e.g. \"^[A-Z0-9-]*$\"). Must be run in conjunction with -F.")
+    # parser.add_argument("-tkt", type=str, help="Add a ticket number as an internal reference")
     args = parser.parse_args()
     
     # Build the intial STIX object
