@@ -28,7 +28,7 @@ The script will run do its best to output what it sees in the STIX file. The scr
         - md5
         - sha1
         - sha256
-        - ssdeep (assuming the pull request I sent to PyMISP today gets accepted)
+        - ssdeep
   - MutexObjectType
     - Mutex name
   - WindowsRegistryKeyObjectType
