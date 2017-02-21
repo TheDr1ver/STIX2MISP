@@ -229,13 +229,14 @@ def processDescriptions(misp,event,filename,all_desc):
     distribution = event['Event']['distribution']
     to_ids = False
     category = 'External analysis'
+    comment = ''
     info = event['Event']['info']
     analysis = event['Event']['analysis']
     threat_level_id = event['Event']['threat_level_id']
         
     # Build the post data
-    to_post = misp.prepare_attribute(event_id, distribution, to_ids,
-                                     category, info, analysis, threat_level_id)
+    to_post = misp._prepare_upload(event_id, distribution, to_ids,
+                                     category, comment, info, analysis, threat_level_id)
     to_post['request']['files'] = [{'filename':filename, 'data': base64.b64encode(all_desc)}]
     out = misp._upload_sample(to_post)
     
