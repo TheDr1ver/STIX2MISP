@@ -24,6 +24,10 @@ import os
 import glob
 import re
 
+
+
+proxies = {}
+
 def mispBuildEvent(misp,misp_url, misp_key,misp_title,misp_date,args):
     # Build the new event
     if not args.distrib:
@@ -67,7 +71,8 @@ def mispBuildEvent(misp,misp_url, misp_key,misp_title,misp_date,args):
 def mispBuildObject(object_type, properties, event, args):
     
     # Set MISP instance
-    misp = PyMISP(misp_url, misp_key, True, 'json')
+#    misp = PyMISP(misp_url, misp_key, False, 'json')
+    misp = PyMISP(misp_url, misp_key, False, 'json', proxies=proxies)
     
     # Process Args
     if not args.ids:
@@ -182,6 +187,13 @@ def mispBuildObject(object_type, properties, event, args):
         # Add to MISP
         misp.add_url(event, str(properties.value), to_ids=args.ids)
 
+    # Grab IP's
+    if "AddressObjectType" in str(object_type):
+        print "        ip: "+str(properties.address_value)
+        
+        # Add to MISP
+        misp.add_ipsrc(event, str(properties.address_value), to_ids=args.ids)
+        
     # Grab Ports
     if "PortObjectType" in str(object_type):
         print "        port: "+str(properties.port_value)
@@ -260,12 +272,22 @@ def forceTag(pkg, args, misp, event, tag):
         print "Response: "+str(out)
 
         
-def processSTIX(pkg, args, misp_url, misp_key):
+def processSTIX(pkg, args, misp_url, misp_key, ssl=True):
     # Load the PyMISP functions
-    misp = PyMISP(misp_url, misp_key, True, 'json')
+#    misp = PyMISP(misp_url, misp_key, ssl, 'json')
+    misp = PyMISP(misp_url, misp_key, ssl, 'json', proxies=proxies)
     
     # Build the event and add tags if applicable
-    misp_title = str(pkg._id)+" | "+str(pkg.stix_header.title)
+    misp_title = ""
+    #if '_id' in pkg:    
+    #    misp_title += str(pkg._id)+" | "
+    misp_title += str(pkg.stix_header.title)
+    if misp_title=="None":
+        try:
+            misp_title = str(pkg.stix_header.information_source.description)+" | "+str(pkg.stix_header.information_source.time.produced_time.value)
+        except:
+            misp_title = str(pkg.id_)
+
     misp_date = str(pkg.timestamp)
     
     event = mispBuildEvent(misp,misp_url,misp_key,misp_title,misp_date,args)
@@ -310,21 +332,22 @@ def processSTIX(pkg, args, misp_url, misp_key):
     
     # Output to screen
     print "\r\n##################"
-    print "ID: "+str(pkg._id)
-    print "Title: "+str(pkg.stix_header.title)
-    print "Time: "+str(pkg.timestamp)
+    #print "ID: "+str(pkg._id)
+    print "Title: "+misp_title
+    print "Time: "+misp_date
     print "##################\r\n"
 
     all_inc_desc=""
     all_ind_desc=""
     
     # Loop through all incidents
-    for inc in pkg.incidents:
-        # Get incindent descriptions
-        for inc_desc in inc.descriptions:
-            if inc_desc:
-                inc_desc = str(inc_desc)
-                all_inc_desc = all_inc_desc+"=============NEW DESCRIPTION=============\n\n"+inc_desc
+    if pkg.incidents:
+        for inc in pkg.incidents:
+            # Get incindent descriptions
+            for inc_desc in inc.descriptions:
+                if inc_desc:
+                    inc_desc = str(inc_desc)
+                    all_inc_desc = all_inc_desc+"=============NEW DESCRIPTION=============\r\n\r\n"+inc_desc
         
     # Loop through all indicators
     for ind in pkg.indicators:
@@ -336,7 +359,7 @@ def processSTIX(pkg, args, misp_url, misp_key):
         for ind_desc in ind.descriptions:
             if ind_desc:
                 ind_desc = str(ind_desc)
-                all_ind_desc = all_ind_desc+"\n\n=============NEW DESCRIPTION=============\n\n"+ind_desc
+                all_ind_desc = all_ind_desc+"\r\n\r\n=============NEW DESCRIPTION=============\r\n\r\n"+ind_desc
         
         # For processing STIX w/ composite_indicator_expression(s)
         if ind.composite_indicator_expression:
@@ -372,8 +395,8 @@ def processSTIX(pkg, args, misp_url, misp_key):
 if __name__ == "__main__":
 
     # MISP Login Info - CHANGE THIS OR IT WON'T WORK!
-    misp_url = 'http://<your_misp_url>'
-    misp_key = '<your_misp_api_key>'
+    misp_url = 'https://127.0.0.1'
+    misp_key = ''
 
     # Input Parser
     
@@ -403,6 +426,6 @@ if __name__ == "__main__":
     # Process the STIX file(s)
     for stix_file in files:
         pkg = STIXPackage.from_xml(stix_file)
-        processSTIX(pkg, args, misp_url, misp_key)
+        processSTIX(pkg, args, misp_url, misp_key, ssl=False)
         
         
